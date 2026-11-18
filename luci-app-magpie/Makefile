@@ -17,3 +17,6 @@ define Package/luci-app-magpie/postinst
 #!/bin/sh
 [ -n "$${IPKG_INSTROOT}" ] || /etc/init.d/rpcd reload
 endef
+
+# call BuildPackage - OpenWrt buildroot signature
+# (The feeds scanner uses this line to index LuCI packages that rely on luci.mk.)
