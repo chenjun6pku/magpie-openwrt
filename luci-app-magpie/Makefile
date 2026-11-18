@@ -16,6 +16,8 @@ define Package/luci-app-magpie
   TITLE:=LuCI support for Magpie AI gateway
   DEPENDS:=+luci-base +rpcd-mod-ucode +magpie
   PKGARCH:=all
+  URL:=https://github.com/chenjun6pku/magpie-openwrt
+  MAINTAINER:=magpie-openwrt contributors
 endef
 
 define Package/luci-app-magpie/description
@@ -36,7 +38,11 @@ endef
 
 define Package/luci-app-magpie/postinst
 #!/bin/sh
-[ -n "$${IPKG_INSTROOT}" ] || /etc/init.d/rpcd reload
+[ -n "$${IPKG_INSTROOT}" ] || {
+	rm -f /tmp/luci-indexcache.*
+	rm -rf /tmp/luci-modulecache/
+	/etc/init.d/rpcd reload
+}
 endef
 
 $(eval $(call BuildPackage,luci-app-magpie))
