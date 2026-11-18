@@ -1,0 +1,21 @@
+# SDKs and build artifacts
+.sdk-*/
+openwrt-sdk-*/
+dist/
+build/
+work/
+release-artifacts/
+
+# Signing material: never commit private keys
+*.sec.pem
+*.key
+*.p12
+*.pfx
+
+# Python / editor artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.vscode/
+.idea/
+.DS_Store

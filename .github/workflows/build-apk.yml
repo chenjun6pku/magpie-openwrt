@@ -1,0 +1,250 @@
+name: Build OpenWrt APKs
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      openwrt_version:
+        description: OpenWrt stable release / SDK version
+        required: true
+        default: '25.12.6'
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: magpie-openwrt-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  OPENWRT_VERSION: ${{ github.event.inputs.openwrt_version || '25.12.6' }}
+
+jobs:
+  validate:
+    name: Static, security and metadata checks
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install validation tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends shellcheck nodejs npm python3-venv curl
+          python3 -m venv "$RUNNER_TEMP/ci-venv"
+          "$RUNNER_TEMP/ci-venv/bin/pip" install --disable-pip-version-check -r requirements-ci.txt
+          echo "$RUNNER_TEMP/ci-venv/bin" >> "$GITHUB_PATH"
+      - name: Run repository validation
+        run: ./scripts/validate-repo.sh
+      - name: Install and run pinned actionlint
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/actionlint_1.7.12_linux_amd64.tar.gz"
+          curl -fL --retry 3 \
+            https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz \
+            -o "$archive"
+          echo '8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  '"$archive" \
+            | sha256sum --check --status
+          tar -xzf "$archive" -C "$RUNNER_TEMP" actionlint
+          "$RUNNER_TEMP/actionlint" -color
+      - name: Validate project and upstream versions
+        run: |
+          python3 scripts/check-versions.py
+          python3 scripts/check-versions.py --verify-upstream
+      - name: Validate release tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: python3 scripts/check-versions.py --tag "$RELEASE_TAG" --verify-upstream
+      - name: Require pinned OpenWrt SDK for release builds
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          set -euo pipefail
+          pinned="$(sed -n 's/^OPENWRT_VERSION=//p' versions.env)"
+          test "$OPENWRT_VERSION" = "$pinned" || {
+            echo "Release must use pinned OpenWrt SDK $pinned, not $OPENWRT_VERSION." >&2
+            exit 1
+          }
+
+  build:
+    needs: validate
+    name: ${{ matrix.package_arch }} (${{ matrix.target }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - package_arch: x86_64
+            target: x86/64
+            target_slug: x86-64
+          - package_arch: aarch64_cortex-a53
+            target: mediatek/filogic
+            target_slug: mediatek-filogic
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install OpenWrt SDK host dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential clang flex bison g++ gawk gcc-multilib \
+            g++-multilib gettext git libncurses-dev libssl-dev \
+            python3 python3-dev python3-setuptools python3-pyelftools \
+            rsync unzip zlib1g-dev file wget curl zstd libelf-dev
+
+      - name: Prepare repository signing key (release tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          SIGNING_KEY_B64: ${{ secrets.MAGPIE_APK_SIGNING_KEY_B64 }}
+        run: |
+          set -euo pipefail
+          test -n "$SIGNING_KEY_B64" || {
+            echo 'Missing repository secret MAGPIE_APK_SIGNING_KEY_B64.' >&2
+            exit 1
+          }
+          key="$RUNNER_TEMP/magpie-repo.sec.pem"
+          printf '%s' "$SIGNING_KEY_B64" | base64 --decode > "$key"
+          chmod 0600 "$key"
+          openssl ec -in "$key" -check -noout
+          echo "SIGNING_KEY_FILE=$key" >> "$GITHUB_ENV"
+
+      - name: Download and verify official OpenWrt SDK
+        id: sdk
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdk_dir="$(./scripts/download-sdk.sh \
+            "$OPENWRT_VERSION" \
+            '${{ matrix.target }}' \
+            '${{ matrix.target_slug }}' \
+            "$RUNNER_TEMP/openwrt-sdk")"
+          echo "sdk_dir=$sdk_dir" >> "$GITHUB_OUTPUT"
+
+      - name: Build and verify Magpie APKs
+        env:
+          JOBS: '2'
+          EXPECTED_PACKAGE_ARCH: ${{ matrix.package_arch }}
+          OUTPUT_DIR: ${{ github.workspace }}/dist/${{ matrix.package_arch }}
+          REQUIRE_SIGNING: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        run: ./scripts/build-sdk.sh "${{ steps.sdk.outputs.sdk_dir }}" "$EXPECTED_PACKAGE_ARCH" "$OUTPUT_DIR"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: magpie-openwrt-${{ matrix.package_arch }}
+          path: dist/${{ matrix.package_arch }}/
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Publish signed APK feeds and GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [ validate, build ]
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Download matrix artifacts with GitHub CLI
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/release-artifacts"
+          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --pattern 'magpie-openwrt-*' --dir "$RUNNER_TEMP/release-artifacts"
+
+      - name: Assemble signed feeds and release assets
+        id: assemble
+        shell: bash
+        run: |
+          set -euo pipefail
+          project_version="$(sed -n 's/^PROJECT_VERSION=//p' versions.env)"
+          openwrt_version="$(sed -n 's/^OPENWRT_VERSION=//p' versions.env)"
+          magpie_version="$(sed -n 's/^MAGPIE_VERSION=//p' versions.env)"
+          test "$GITHUB_REF_NAME" = "v$project_version"
+
+          site="$RUNNER_TEMP/site"
+          assets="$RUNNER_TEMP/release-assets"
+          mkdir -p "$site" "$assets"
+          for arch in x86_64 aarch64_cortex-a53; do
+            source_dir="$RUNNER_TEMP/release-artifacts/magpie-openwrt-$arch"
+            test -s "$source_dir/FEED_STATUS.txt"
+            grep -qx 'SIGNED_FEED' "$source_dir/FEED_STATUS.txt"
+            test -s "$source_dir/packages.adb"
+            test -s "$source_dir/magpie-repo.pub"
+            feed_dir="$site/openwrt-$openwrt_version/$arch"
+            mkdir -p "$feed_dir"
+            cp -a "$source_dir"/. "$feed_dir"/
+            if [[ -f "$site/magpie-repo.pub" ]] && ! cmp -s "$site/magpie-repo.pub" "$source_dir/magpie-repo.pub"; then
+              echo 'The architecture jobs used different repository signing keys.' >&2
+              exit 1
+            fi
+            cp "$source_dir/magpie-repo.pub" "$site/magpie-repo.pub"
+            cp "$source_dir/SHA256SUMS" "$assets/SHA256SUMS-$arch"
+            cp "$source_dir/BUILD-INFO.txt" "$assets/BUILD-INFO-$arch.txt"
+            for package in "$source_dir"/*.apk; do
+              filename="$(basename "$package" .apk)"
+              cp "$package" "$assets/${filename}-${arch}.apk"
+            done
+            tar -C "$site" -czf "$assets/magpie-openwrt-${project_version}-openwrt-${openwrt_version}-${arch}-feed.tar.gz" \
+              "openwrt-$openwrt_version/$arch" magpie-repo.pub
+          done
+          printf 'Magpie OpenWrt signed APK feed\nProject: %s\nOpenWrt: %s\nMagpie: %s\n' \
+            "$project_version" "$openwrt_version" "$magpie_version" > "$site/README.txt"
+          printf '%s\n' "$site" > "$RUNNER_TEMP/site-path"
+          printf '%s\n' "$assets" > "$RUNNER_TEMP/assets-path"
+          printf 'site_path=%s\n' "$site" >> "$GITHUB_OUTPUT"
+          printf 'assets_path=%s\n' "$assets" >> "$GITHUB_OUTPUT"
+
+      - name: Publish signed feed to gh-pages branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          site="${{ steps.assemble.outputs.site_path }}"
+          publish="$RUNNER_TEMP/gh-pages"
+          git init "$publish"
+          git -C "$publish" remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git -C "$publish" config user.name 'github-actions[bot]'
+          git -C "$publish" config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          if git -C "$publish" fetch origin gh-pages; then
+            git -C "$publish" checkout -B gh-pages FETCH_HEAD
+          else
+            git -C "$publish" checkout --orphan gh-pages
+          fi
+          cp -a "$site"/. "$publish"/
+          touch "$publish/.nojekyll"
+          git -C "$publish" add -A
+          if git -C "$publish" diff --cached --quiet; then
+            echo 'gh-pages feed is already up to date.'
+          else
+            git -C "$publish" commit -m "Publish signed Magpie OpenWrt feed ${GITHUB_REF_NAME}"
+            git -C "$publish" push origin gh-pages
+          fi
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          assets="${{ steps.assemble.outputs.assets_path }}"
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "$assets"/* \
+              --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "$assets"/* \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "Magpie OpenWrt $GITHUB_REF_NAME" \
+              --generate-notes
+          fi

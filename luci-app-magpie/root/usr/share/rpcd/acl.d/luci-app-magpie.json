@@ -1,0 +1,17 @@
+{
+  "luci-app-magpie": {
+    "description": "Manage Magpie configuration and service",
+    "read": {
+      "uci": [ "magpie" ],
+      "ubus": {
+        "magpie": [ "status" ]
+      }
+    },
+    "write": {
+      "uci": [ "magpie" ],
+      "ubus": {
+        "magpie": [ "start", "stop", "restart" ]
+      }
+    }
+  }
+}

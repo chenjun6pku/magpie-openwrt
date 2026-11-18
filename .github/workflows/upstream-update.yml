@@ -1,0 +1,36 @@
+name: Check upstream Magpie release
+
+on:
+  schedule:
+    - cron: '23 4 * * *'
+  workflow_dispatch:
+
+# Checkout only needs read access. A repository-scoped PAT is used deliberately
+# for the update PR so GitHub emits the pull_request event and runs build CI.
+permissions:
+  contents: read
+
+concurrency:
+  group: magpie-upstream-update
+  cancel-in-progress: false
+
+jobs:
+  update-pr:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Open an update PR if upstream has a new release
+        env:
+          GH_TOKEN: ${{ secrets.MAGPIE_UPDATER_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$GH_TOKEN" || {
+            echo 'Missing repository secret MAGPIE_UPDATER_TOKEN.' >&2
+            exit 1
+          }
+          gh auth setup-git
+          python3 scripts/update-upstream.py --create-pr

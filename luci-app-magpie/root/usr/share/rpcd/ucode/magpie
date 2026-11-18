@@ -1,0 +1,43 @@
+'use strict';
+
+import { popen } from 'fs';
+
+function run_service_action(action) {
+	let proc = popen([ '/etc/init.d/magpie', action ], 'r');
+	if (proc == null)
+		return { ok: false, exit_code: 127, output: 'Unable to execute Magpie init script' };
+
+	let output = proc.read('all') ?? '';
+	let rc = proc.close();
+
+	return {
+		ok: rc == 0,
+		exit_code: rc,
+		output: output
+	};
+}
+
+return {
+	magpie: {
+		status: {
+			call: function() {
+				return run_service_action('status');
+			}
+		},
+		start: {
+			call: function() {
+				return run_service_action('start');
+			}
+		},
+		stop: {
+			call: function() {
+				return run_service_action('stop');
+			}
+		},
+		restart: {
+			call: function() {
+				return run_service_action('restart');
+			}
+		}
+	}
+};
