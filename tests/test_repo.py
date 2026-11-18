@@ -135,6 +135,14 @@ class RepositorySecurityTests(unittest.TestCase):
         self.assertIn("Refusing unsafe output directory", script)
         self.assertNotIn('find "$output_dir" -maxdepth 1 -type f -delete', script)
 
+    def test_build_sdk_does_not_build_luci_feed_chain(self) -> None:
+        # luci-base's host build pulls in lucihttp, whose lua/ucode headers
+        # are not in the SDK. The LuCI page is self-contained; luci-base is
+        # only a runtime dependency on the target.
+        script = (ROOT / "scripts/build-sdk.sh").read_text(encoding="utf-8")
+        self.assertNotIn("feeds install -p luci luci-base", script)
+        self.assertNotIn("feeds update packages luci magpie", script)
+
     def test_upgrade_notes_exist(self) -> None:
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         self.assertIn("Upgrading from v1", readme)

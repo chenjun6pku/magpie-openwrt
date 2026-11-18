@@ -46,9 +46,12 @@ if ! grep -qE '^src-link[[:space:]]+magpie[[:space:]]' "$feeds_file" 2>/dev/null
   printf '\nsrc-link magpie %s\n' "$repo_root" >> "$feeds_file"
 fi
 
-./scripts/feeds update packages luci magpie
+# The LuCI page is self-contained. Do not install the luci feed's
+# luci-base/lucihttp build chain: the SDK does not carry the base feed's
+# lua/ucode development files. luci-base and rpcd-mod-ucode are runtime
+# dependencies resolved from the target's official feeds.
+./scripts/feeds update packages magpie
 ./scripts/feeds install -p packages golang
-./scripts/feeds install -p luci luci-base
 ./scripts/feeds install -p magpie magpie luci-app-magpie
 
 make defconfig
