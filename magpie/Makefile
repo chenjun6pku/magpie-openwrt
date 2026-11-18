@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=magpie
 PKG_VERSION:=0.1.4444
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 
 # Pin the upstream Git object rather than relying on an unverified source
 # archive. CI resolves the upstream tag and confirms it matches this commit.

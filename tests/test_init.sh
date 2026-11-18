@@ -80,6 +80,14 @@ if grep -qE 'procd_set_param[[:space:]]+stdout[[:space:]]+1' "$ROOT/magpie/files
   fail 'init must not relay stdout to syslog (it contains the keyed Web Console link)'
 fi
 
+# BusyBox od does not consistently accept the old combined flags; the key
+# generator must still produce a 64-character lowercase hex value.
+generated_key="$(make_web_key)"
+[[ ${#generated_key} -eq 64 ]] || fail 'make_web_key must return 64 characters'
+case "$generated_key" in
+  *[!0-9a-f]*) fail 'make_web_key must return lowercase hex' ;;
+esac
+
 # Existing key files are re-secured on every service start, not only at creation.
 key_test_file="$(mktemp)"
 WEB_KEY_FILE="$key_test_file"

@@ -6,8 +6,8 @@ This record distinguishes checks performed against the source bundle from checks
 
 - Python source compilation (`python3 -m py_compile scripts/*.py tests/*.py`).
 - Project/tag metadata validation, including upstream tag-to-commit resolution (`scripts/check-versions.py --verify-upstream`).
-- 30 Python unit tests.
-- procd/init behavior test, including the v1 UCI migration (wildcard `gateway_addr` → loopback, UCI `web_key` → root-only secret file, `web_addr` removal), loopback defaults, rejected unsafe and non-canonical data paths, wildcard/non-literal Gateway binds, port validation, degraded status when either listener is absent despite a live PID, and re-securing a restored Web Console key to mode `0600`.
+- 31 Python unit tests.
+- procd/init behavior test, including the v1 UCI migration (wildcard `gateway_addr` → loopback, UCI `web_key` → root-only secret file, `web_addr` removal), BusyBox-compatible 64-character key generation, loopback defaults, rejected unsafe and non-canonical data paths, wildcard/non-literal Gateway binds, port validation, degraded status when either listener is absent despite a live PID, and re-securing a restored Web Console key to mode `0600`.
 - APK feed signing-flow test using a temporary P-256 key and a mocked SDK `apk` executable. This checks command ordering, output layout, package architecture validation, and checksums; it is not a cryptographic verification by OpenWrt's real `apk` binary.
 - Bash/POSIX shell syntax checks.
 - LuCI JavaScript syntax check with Node.js.

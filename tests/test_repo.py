@@ -121,6 +121,13 @@ class RepositorySecurityTests(unittest.TestCase):
         self.assertIn("window.location.hostname", js)
         self.assertIn("root@' + routerHost", js)
 
+    def test_rpcd_plugin_uses_string_popen(self) -> None:
+        # fs.popen() on OpenWrt 25.12 expects a string; the array form
+        # returned null and made every LuCI status/control call fail 127.
+        ucode = (ROOT / "luci-app-magpie/root/usr/share/rpcd/ucode/magpie").read_text(encoding="utf-8")
+        self.assertIn("popen('/etc/init.d/magpie ' + action", ucode)
+        self.assertNotIn("popen([", ucode)
+
     def test_init_does_not_relay_stdout_to_syslog(self) -> None:
         init = (ROOT / "magpie/files/magpie.init").read_text(encoding="utf-8")
         self.assertNotIn("procd_set_param stdout 1", init)
