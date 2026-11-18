@@ -2,10 +2,30 @@
 
 import { popen } from 'fs';
 
+function service_command(action) {
+	switch (action) {
+	case 'status':
+		return 'status';
+	case 'start':
+		return 'start';
+	case 'stop':
+		return 'stop';
+	case 'restart':
+		return 'restart';
+	default:
+		return null;
+	}
+}
+
 function run_service_action(action) {
-	// fs.popen() on OpenWrt 25.12 expects a command string; the array form
+	// Keep the command derived only from the fixed allowlist above. The
+	// fs.popen() string form is required on OpenWrt 25.12; the array form
 	// returns null and surfaces as exit_code 127 in LuCI.
-	let proc = popen('/etc/init.d/magpie ' + action, 'r');
+	let command = service_command(action);
+	if (command == null)
+		return { ok: false, exit_code: 2, output: 'Invalid Magpie service action' };
+
+	let proc = popen('/etc/init.d/magpie ' + command, 'r');
 	if (proc == null)
 		return { ok: false, exit_code: 127, output: 'Unable to execute Magpie init script' };
 

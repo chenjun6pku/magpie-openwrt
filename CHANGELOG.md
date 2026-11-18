@@ -15,9 +15,10 @@
   because BusyBox `od` does not consistently accept the previous combined
   `-An`/`-tx1` flags. This fixes an init loop that reported
   `failed to generate MAGPIE_WEB_KEY` and never started the service.
-- The rpcd plugin uses `fs.popen()` with a command string. The previous array
-  form returned null on OpenWrt 25.12 and made LuCI status/start/stop/restart
-  calls fail with exit code 127.
+- The rpcd plugin uses a strict `status`/`start`/`stop`/`restart` allowlist and
+  `fs.popen()` with a command string. The previous array form returned null on
+  OpenWrt 25.12 and made LuCI status/start/stop/restart calls fail with exit
+  code 127; no caller-controlled text reaches the shell.
 - Gateway wildcard listeners (including expanded IPv6 and IPv4-mapped forms)
   and hostname listeners are rejected.
 - `data_dir` rejects non-canonical paths (`//`, `/.`, `/..`) so the secrets

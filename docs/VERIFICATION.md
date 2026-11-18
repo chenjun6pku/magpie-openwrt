@@ -13,7 +13,7 @@ This record distinguishes checks performed against the source bundle from checks
 - LuCI JavaScript syntax check with Node.js.
 - YAML parsing for GitHub workflows and Dependabot configuration (`yamllint 1.37.1`).
 - JSON parsing for LuCI menu and rpcd ACL files.
-- Static regression checks for full SHA-pinned GitHub Actions, absence of UCI/browser Web Key exposure, absence of stdout→syslog logging in the init script, the `build-sdk.sh` output-directory guard, a real `BuildPackage` line in the self-contained LuCI Makefile so OpenWrt's `include/scan.mk` indexes it, and no `luci-base`/`lucihttp` build in the SDK (its runtime dependency is resolved on the target).
+- Static regression checks for full SHA-pinned GitHub Actions, absence of UCI/browser Web Key exposure, absence of stdout→syslog logging in the init script, the `build-sdk.sh` output-directory guard, a real `BuildPackage` line in the self-contained LuCI Makefile so OpenWrt's `include/scan.mk` indexes it, no `luci-base`/`lucihttp` build in the SDK (its runtime dependency is resolved on the target), and a fixed `service_command()` allowlist in the rpcd plugin instead of a caller-derived shell string.
 - ShellCheck 0.10.0 (`--severity=warning`), mypy 1.18.2 (`--strict --python-version 3.11`), yamllint 1.37.1, and actionlint 1.7.12 run successfully against the source bundle.
 
 ## Required before calling a GitHub Release production-verified
