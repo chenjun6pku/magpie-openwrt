@@ -93,12 +93,18 @@ return view.extend({
 			var statusNode = E('span', {
 				'class': healthy ? 'label success' : 'label warning'
 			}, statusText);
-			var accessInfo = E('div', { 'class': 'alert-message notice' }, [
-				E('p', {}, _('The Web Console listens only on 127.0.0.1:3430. LuCI deliberately does not read or transmit its long-term access key. Use an SSH tunnel from your administrator workstation:')),
-				E('pre', {}, 'ssh -L 3430:127.0.0.1:3430 root@<router-lan-ip>'),
+			// window.location.hostname is the host the administrator used to
+			// reach LuCI. Do not use an angle-bracket placeholder here: LuCI's
+			// E() parses strings as HTML and would drop the placeholder.
+			var routerHost = window.location.hostname || 'ROUTER_LAN_IP';
+			var accessInfo = E('div', { 'class': healthy ? 'alert-message notice' : 'alert-message warning' }, [
+				E('p', {}, healthy
+					? _('The Web Console listens only on 127.0.0.1:3430. LuCI deliberately does not read or transmit its long-term access key. Use an SSH tunnel from your administrator workstation:')
+					: _('The service is not healthy. Fix the status shown above before opening the Web Console; the listeners may not be running yet.')),
+				E('pre', {}, 'ssh -L 3430:127.0.0.1:3430 root@' + routerHost),
 				E('p', {}, _('In a separate terminal, retrieve the root-only key over SSH:')),
-				E('pre', {}, 'ssh root@<router-lan-ip> "cat /etc/magpie/secrets/web.key"'),
-				E('p', {}, _('Then open http://127.0.0.1:3430/ in your workstation browser and enter the key in Magpie’s sign-in prompt. Do not share the key or put it in a saved URL.'))
+				E('pre', {}, 'ssh root@' + routerHost + ' "cat /etc/magpie/secrets/web.key"'),
+				E('p', {}, _('Replace the host with the router LAN IP if you reach LuCI through a reverse proxy. Then open http://127.0.0.1:3430/ in your workstation browser and enter the key in Magpie’s sign-in prompt. Do not share the key or put it in a saved URL.'))
 			]);
 			var actions = E('div', { 'class': 'cbi-section' }, [
 				E('h3', {}, _('Runtime health')),

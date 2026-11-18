@@ -113,6 +113,14 @@ class RepositorySecurityTests(unittest.TestCase):
         luci = (ROOT / "luci-app-magpie/Makefile").read_text(encoding="utf-8")
         self.assertRegex(luci, r"(?m)^define Build/Compile\nendef$")
 
+    def test_luci_page_uses_safe_ssh_host(self) -> None:
+        # E() parses string children as HTML; an angle-bracket placeholder is
+        # dropped and leaves an unusable "root@" command.
+        js = (ROOT / "luci-app-magpie/htdocs/luci-static/resources/view/magpie/overview.js").read_text(encoding="utf-8")
+        self.assertNotIn("<router-lan-ip>", js)
+        self.assertIn("window.location.hostname", js)
+        self.assertIn("root@' + routerHost", js)
+
     def test_init_does_not_relay_stdout_to_syslog(self) -> None:
         init = (ROOT / "magpie/files/magpie.init").read_text(encoding="utf-8")
         self.assertNotIn("procd_set_param stdout 1", init)
