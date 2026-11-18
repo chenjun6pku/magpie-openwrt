@@ -100,12 +100,12 @@ class RepositorySecurityTests(unittest.TestCase):
             metadata["PROJECT_VERSION"],
         )
 
-    def test_luci_makefile_has_feed_scanner_signature(self) -> None:
+    def test_luci_makefile_has_buildpackage_signature(self) -> None:
         # OpenWrt's include/scan.mk only indexes Makefiles containing a
-        # "call BuildPackage" line. LuCI packages get this from the standard
-        # signature comment because the actual call lives in luci.mk.
+        # "call BuildPackage" line. Keep the package self-contained instead
+        # of relying on luci.mk to emit it.
         luci = (ROOT / "luci-app-magpie/Makefile").read_text(encoding="utf-8")
-        self.assertRegex(luci, r"(?m)^# call BuildPackage - OpenWrt buildroot signature$")
+        self.assertIn("$(eval $(call BuildPackage,luci-app-magpie))", luci)
 
     def test_init_does_not_relay_stdout_to_syslog(self) -> None:
         init = (ROOT / "magpie/files/magpie.init").read_text(encoding="utf-8")

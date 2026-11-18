@@ -1,22 +1,42 @@
 include $(TOPDIR)/rules.mk
 
+PKG_NAME:=luci-app-magpie
 PKG_VERSION:=2.0.0
 PKG_RELEASE:=1
-
-LUCI_TITLE:=LuCI support for Magpie AI gateway
-LUCI_DEPENDS:=+luci-base +rpcd-mod-ucode +magpie
-LUCI_PKGARCH:=all
 
 PKG_LICENSE:=MIT
 PKG_MAINTAINER:=magpie-openwrt contributors
 
-include $(TOPDIR)/feeds/luci/luci.mk
+include $(INCLUDE_DIR)/package.mk
 
-# The RPC plugin is discovered when rpcd starts; reload it after installation.
+define Package/luci-app-magpie
+  SECTION:=luci
+  CATEGORY:=LuCI
+  SUBMENU:=3. Applications
+  TITLE:=LuCI support for Magpie AI gateway
+  DEPENDS:=+luci-base +rpcd-mod-ucode +magpie
+  PKGARCH:=all
+endef
+
+define Package/luci-app-magpie/description
+LuCI service-management page for the Magpie AI provider/model gateway.
+Provider and model administration remains in Magpie's Web Console.
+endef
+
+define Package/luci-app-magpie/install
+	$(INSTALL_DIR) $(1)/www/luci-static/resources/view/magpie
+	$(INSTALL_DATA) ./htdocs/luci-static/resources/view/magpie/overview.js $(1)/www/luci-static/resources/view/magpie/overview.js
+	$(INSTALL_DIR) $(1)/usr/share/luci/menu.d
+	$(INSTALL_DATA) ./root/usr/share/luci/menu.d/luci-app-magpie.json $(1)/usr/share/luci/menu.d/luci-app-magpie.json
+	$(INSTALL_DIR) $(1)/usr/share/rpcd/acl.d
+	$(INSTALL_DATA) ./root/usr/share/rpcd/acl.d/luci-app-magpie.json $(1)/usr/share/rpcd/acl.d/luci-app-magpie.json
+	$(INSTALL_DIR) $(1)/usr/share/rpcd/ucode
+	$(INSTALL_BIN) ./root/usr/share/rpcd/ucode/magpie $(1)/usr/share/rpcd/ucode/magpie
+endef
+
 define Package/luci-app-magpie/postinst
 #!/bin/sh
 [ -n "$${IPKG_INSTROOT}" ] || /etc/init.d/rpcd reload
 endef
 
-# call BuildPackage - OpenWrt buildroot signature
-# (The feeds scanner uses this line to index LuCI packages that rely on luci.mk.)
+$(eval $(call BuildPackage,luci-app-magpie))
