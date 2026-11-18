@@ -107,6 +107,12 @@ class RepositorySecurityTests(unittest.TestCase):
         luci = (ROOT / "luci-app-magpie/Makefile").read_text(encoding="utf-8")
         self.assertIn("$(eval $(call BuildPackage,luci-app-magpie))", luci)
 
+    def test_luci_package_has_empty_build_compile(self) -> None:
+        # The package only installs files; without an explicit empty
+        # Build/Compile the OpenWrt default runs make in an empty directory.
+        luci = (ROOT / "luci-app-magpie/Makefile").read_text(encoding="utf-8")
+        self.assertRegex(luci, r"(?m)^define Build/Compile\nendef$")
+
     def test_init_does_not_relay_stdout_to_syslog(self) -> None:
         init = (ROOT / "magpie/files/magpie.init").read_text(encoding="utf-8")
         self.assertNotIn("procd_set_param stdout 1", init)

@@ -9,6 +9,11 @@ PKG_MAINTAINER:=magpie-openwrt contributors
 
 include $(INCLUDE_DIR)/package.mk
 
+# File-only package: the default Build/Compile would run make in an empty
+# build directory.
+define Build/Compile
+endef
+
 define Package/luci-app-magpie
   SECTION:=luci
   CATEGORY:=LuCI
